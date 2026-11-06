@@ -289,7 +289,7 @@ local function buildStand()
     local self = selfChar()
     if not self then return end
 
-    State:VanishStand()
+    vanishStand()
 
     local stand = Instance.new("Model")
     stand.Name = "Stand_" .. LP.Name
