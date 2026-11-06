@@ -1303,29 +1303,28 @@ local function checkPresence(userId)
 end
 
 local function getTargetServer(userId)
-    local placeId = daHoodPlaceId()
-    local res, err = httpRequest({
-        Url    = "https://www.roblox.com/game/join?placeId=" .. placeId .. "&userId=" .. userId,
-        Method = "GET",
-        Headers = { ["Cookie"] = ".ROBLOSECURITY=" .. (getOwnCookie() or "") },
-    })
-    if not res then return nil, err end
-    local jobId
-    jobId = (res.Body and res.Body:match("gameInstanceId=([%w%-]+)"))
-        or (res.Body and res.Body:match("joinGameInstance%(%s*%d+%s*,[^\"']*[\"']([%w%-]+)"))
-        or (res.Body and res.Body:match("[\"']([a-f0-9%-]+)[\"']%s*%)"))
-    if not jobId and res.Headers then
-        local loc = res.Headers.Location or res.Headers.location or res.Headers["Location"]
-        if loc then jobId = loc:match("gameInstanceId=([%w%-]+)") end
+    -- official client-side lookup — no HTTP, no cookie needed
+    local results = { pcall(function()
+        return TeleportService:GetPlayerPlaceInstanceAsync(userId)
+    end) }
+    if not results[1] then
+        return nil, nil
     end
-    return jobId, nil
+    local jobId, placeId
+    for i = 2, #results do
+        local v = results[i]
+        if type(v) == "string" and #v >= 30 then
+            jobId = v
+        elseif type(v) == "number" then
+            placeId = v
+        end
+    end
+    return jobId, placeId
 end
 
 local function hopToTarget()
     local name = Follow.Target
     if not name or name == "" then return "no target set" end
-
-    if not Executor.HttpFn then return "no http function" end
 
     local targetPlr = Players:FindFirstChild(name)
     if targetPlr then
@@ -1336,20 +1335,15 @@ local function hopToTarget()
         return "target in server, stand given"
     end
 
-    if not getOwnCookie() then return "no cookie set" end
-
     local userId = resolveUserId(name)
     if not userId then return "could not resolve user" end
 
-    local up, err = checkPresence(userId)
-    if not up then return "presence failed: " .. tostring(err) end
+    local jobId, placeId = getTargetServer(userId)
+    if not jobId then return "could not find their server" end
 
-    if tostring(up.placeId) ~= tostring(daHoodPlaceId()) then
+    if placeId and tostring(placeId) ~= tostring(daHoodPlaceId()) then
         return "target not in Da Hood"
     end
-
-    local jobId, jerr = getTargetServer(userId)
-    if not jobId then return "server lookup failed" end
 
     pcall(function()
         TeleportService:TeleportToPlaceInstance(daHoodPlaceId(), jobId)
