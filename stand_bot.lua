@@ -1493,9 +1493,15 @@ local function runCommand(message)
     execCommand(body)
 end
 
--- route chat from the current controller only
+-- route chat from the owner (main account) and the current controller
+local function isCommandSource(plr)
+    if plr == State.Controller then return true end
+    if Settings.MainAccount and plr.Name:lower() == tostring(Settings.MainAccount):lower() then return true end
+    return false
+end
+
 Players.PlayerChatted:Connect(function(plr, message)
-    if plr == State.Controller then
+    if isCommandSource(plr) then
         runCommand(message)
     end
 end)
