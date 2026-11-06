@@ -1486,7 +1486,10 @@ local function execCommand(body)
     local args = { select(2, unpack(parts)) }
     local fn = Dispatch[cmd]
     if fn then
-        pcall(function() fn(args) end)
+        local ok, err = pcall(function() fn(args) end)
+        if not ok then
+            notif("error: " .. tostring(err))
+        end
     else
         notif("unknown command: " .. tostring(cmd))
     end
@@ -1505,7 +1508,13 @@ local function isCommandSource(plr)
     return false
 end
 
+local chatSeen = false
 local function handleMessage(player, message)
+    if not chatSeen then
+        chatSeen = true
+        notif("chat detected: " .. player.Name)
+    end
+    print("[stand bot] chat: " .. player.Name .. ": " .. tostring(message))
     if isCommandSource(player) then
         runCommand(message)
     end
