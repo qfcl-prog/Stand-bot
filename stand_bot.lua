@@ -8,7 +8,7 @@
 -- CONFIG
 -- ============================================================
 getgenv().ScriptSettings = {
-    MainAccount = "XxLeviLegendxX26",
+    MainAccount = "IAmABag_20",
     Configs = {
         Prefix = ".",            -- command prefix (chat)
         Mask = "ninja",
