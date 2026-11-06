@@ -1,14 +1,36 @@
 # discord_bot.py
 # Discord controller for the Da Hood stand bot.
+# secrets live in a .env file next to this script, not in this file.
 # run: python discord_bot.py
 
+import os
 import discord
 from discord import app_commands
 
-# ==================== CONFIG ====================
-TOKEN = "PASTE_DISCORD_BOT_TOKEN_HERE"
-COMMAND_CHANNEL_ID = 0   # int — the channel bots poll for commands
-# ================================================
+# ---- load .env (no extra dependencies) ----
+def load_env(path=".env"):
+    try:
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        pass
+
+load_env()
+
+TOKEN = os.getenv("DISCORD_TOKEN")
+COMMAND_CHANNEL_ID = int(os.getenv("COMMAND_CHANNEL_ID", "0") or 0)
+
+if not TOKEN:
+    print("DISCORD_TOKEN missing — check your .env file")
+    raise SystemExit(1)
+if not COMMAND_CHANNEL_ID:
+    print("COMMAND_CHANNEL_ID missing — check your .env file")
+    raise SystemExit(1)
 
 intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
@@ -90,9 +112,6 @@ class CommandView(discord.ui.View):
         super().__init__(timeout=300)
         for c in cmds:
             self.add_item(CommandButton(c))
-
-    async def on_timeout(self):
-        pass
 
 
 class CategoryView(discord.ui.View):

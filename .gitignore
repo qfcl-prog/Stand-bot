@@ -1,0 +1,10 @@
+# secrets — never commit these
+.env
+.env.*
+
+# python junk
+__pycache__/
+*.pyc
+
+# the loader holds per-bot secrets, keep it local
+stand_bot_loader.lua
