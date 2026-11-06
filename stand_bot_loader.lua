@@ -1,6 +1,6 @@
 -- stand_bot_loader.lua
 -- paste THIS into your executor. it pulls the full script from GitHub.
-local url = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/stand_bot.lua"
+local url = "https://raw.githubusercontent.com/qfcl-prog/Stand-bot/main/stand_bot.lua"
 
 local ok, err = pcall(function()
     loadstring(game:HttpGet(url))()
