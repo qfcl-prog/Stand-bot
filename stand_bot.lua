@@ -1505,12 +1505,16 @@ local function isCommandSource(plr)
     return false
 end
 
+local function handleMessage(player, message)
+    if isCommandSource(player) then
+        runCommand(message)
+    end
+end
+
 local function hookChat(player)
     if player.Chatted then
         player.Chatted:Connect(function(message)
-            if isCommandSource(player) then
-                runCommand(message)
-            end
+            handleMessage(player, message)
         end)
     end
 end
@@ -1519,6 +1523,19 @@ for _, p in ipairs(Players:GetPlayers()) do
     hookChat(p)
 end
 Players.PlayerAdded:Connect(hookChat)
+
+-- newer games use TextChatService instead of legacy Player.Chatted
+local TextChatService = game:GetService("TextChatService")
+if TextChatService and TextChatService.MessageReceived then
+    TextChatService.MessageReceived:Connect(function(message)
+        local text = message.Text
+        local userId = message.TextSource and message.TextSource.UserId
+        local player = userId and Players:GetPlayerByUserId(userId)
+        if player and text then
+            handleMessage(player, text)
+        end
+    end)
+end
 
 -- if the controller leaves, return ownership to you
 Players.PlayerRemoving:Connect(function(plr)
