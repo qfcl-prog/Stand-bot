@@ -7,7 +7,7 @@
 -- ============================================================
 -- CONFIG
 -- ============================================================
-getgenv().ScriptSettings = {
+local DEFAULT_SETTINGS = {
     MainAccount = "IAmABag_20",
     Configs = {
         Prefix = ".",            -- command prefix (chat)
@@ -39,7 +39,7 @@ getgenv().ScriptSettings = {
     },
 }
 
-getgenv().ScriptCommands = {
+local DEFAULT_COMMANDS = {
     ["Fix Script"] = "fix",
     ["Reset Stand"] = "reset",
     ["Ascend"] = "summon",
@@ -107,6 +107,24 @@ getgenv().ScriptCommands = {
     ["Unfollow"] = "unfollow",
     ["Redeem Codes"] = "codes",
 }
+
+-- merge any config set BEFORE loadstring (original-style injection still works)
+local function mergeTable(base, over)
+    if type(over) ~= "table" then return base end
+    for k, v in pairs(over) do
+        if type(v) == "table" and type(base[k]) == "table" then
+            for k2, v2 in pairs(v) do
+                base[k][k2] = v2
+            end
+        else
+            base[k] = v
+        end
+    end
+    return base
+end
+
+getgenv().ScriptSettings = mergeTable(DEFAULT_SETTINGS, getgenv().ScriptSettings)
+getgenv().ScriptCommands = mergeTable(DEFAULT_COMMANDS, getgenv().ScriptCommands)
 
 -- ============================================================
 -- ENVIRONMENT / SERVICES
@@ -1545,6 +1563,60 @@ if TextChatService and TextChatService.MessageReceived then
         end
     end)
 end
+
+-- ============================================================
+-- GUI COMMAND BAR (reliable input — doesn't depend on chat)
+-- ============================================================
+local function createCommandBar()
+    local ok, container = pcall(function()
+        return game:GetService("CoreGui")
+    end)
+    if not ok or not container then
+        container = LP:WaitForChild("PlayerGui")
+    end
+
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "StandBotCmd"
+    sg.ResetOnSpawn = false
+    sg.Parent = container
+
+    local frame = Instance.new("Frame")
+    frame.Name = "Bar"
+    frame.Size = UDim2.new(0, 340, 0, 44)
+    frame.Position = UDim2.new(0.5, -170, 0.06, 0)
+    frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    frame.BorderSizePixel = 0
+    frame.Parent = sg
+
+    local box = Instance.new("TextBox")
+    box.Name = "Input"
+    box.Size = UDim2.new(1, -12, 1, -12)
+    box.Position = UDim2.new(0, 6, 0, 6)
+    box.BackgroundColor3 = Color3.fromRGB(42, 42, 42)
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+    box.PlaceholderText = "type command here (e.g. .kill Bob) — press Enter"
+    box.Text = ""
+    box.ClearTextOnFocus = false
+    box.TextSize = 16
+    box.Font = Enum.Font.SourceSans
+    box.Parent = frame
+
+    box.FocusLost:Connect(function(enterPressed)
+        if not enterPressed then return end
+        local txt = box.Text
+        box.Text = ""
+        txt = txt:gsub("^%s+", ""):gsub("%s+$", "")
+        if txt ~= "" then
+            if txt:sub(1, 1) ~= Prefix then
+                txt = Prefix .. txt
+            end
+            runCommand(txt)
+        end
+    end)
+end
+
+createCommandBar()
 
 -- if the controller leaves, return ownership to you
 Players.PlayerRemoving:Connect(function(plr)
