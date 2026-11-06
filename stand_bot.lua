@@ -1631,6 +1631,7 @@ end)
 -- ============================================================
 local Discord = Settings.Discord or {}
 local DiscordLastMsg = nil
+local DiscordWarned = false
 
 local function discordFetch(path)
     return httpRequest({
@@ -1640,6 +1641,12 @@ local function discordFetch(path)
     })
 end
 
+-- discord snowflakes exceed double precision, so compare as strings
+local function isNewerId(a, b)
+    if #a ~= #b then return #a > #b end
+    return a > b
+end
+
 local function pollDiscord()
     if not Discord.Enabled
         or not Discord.BotToken or Discord.BotToken == ""
@@ -1647,15 +1654,30 @@ local function pollDiscord()
         return
     end
 
-    local res = discordFetch("/channels/" .. Discord.ChannelId .. "/messages?limit=5")
-    if not res then return end
+    local res = discordFetch("/channels/" .. Discord.ChannelId .. "/messages?limit=10")
+    if not res then
+        if not DiscordWarned then
+            DiscordWarned = true
+            notif("discord poll failed (no response)")
+        end
+        return
+    end
 
     local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
-    if not ok or type(data) ~= "table" or #data == 0 then return end
+    if not ok or type(data) ~= "table" then
+        if not DiscordWarned then
+            DiscordWarned = true
+            notif("discord poll failed (bad response)")
+        end
+        return
+    end
+
+    if #data == 0 then return end
 
     -- first poll: sync to latest without replaying old commands
     if not DiscordLastMsg then
         DiscordLastMsg = data[1].id
+        notif("discord connected")
         return
     end
 
@@ -1664,7 +1686,7 @@ local function pollDiscord()
     for i = #data, 1, -1 do  -- oldest -> newest
         local m = data[i]
         local mid = m and m.id
-        if mid and tonumber(mid) > tonumber(DiscordLastMsg) then
+        if mid and isNewerId(mid, DiscordLastMsg) then
             table.insert(toRun, m.content or "")
             newId = mid
         end
@@ -1672,7 +1694,10 @@ local function pollDiscord()
     DiscordLastMsg = newId
 
     for _, content in ipairs(toRun) do
-        execCommand(content)
+        local cmd = content:match("^(%S+)")
+        if cmd and Dispatch[cmd:lower()] then
+            execCommand(content)
+        end
     end
 end
 
