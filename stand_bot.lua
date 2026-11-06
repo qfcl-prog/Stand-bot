@@ -129,6 +129,13 @@ local Commands  = getgenv().ScriptCommands
 local Config    = Settings.Configs
 local Prefix    = Config.Prefix
 
+-- inject per-bot secrets (set in the loader, never in this public file)
+local Secrets = getgenv().Secrets or {}
+if Secrets.DiscordToken then Settings.Discord.BotToken = Secrets.DiscordToken end
+if Secrets.DiscordChannel then Settings.Discord.ChannelId = Secrets.DiscordChannel end
+if Secrets.DiscordEnabled ~= nil then Settings.Discord.Enabled = Secrets.DiscordEnabled end
+if Secrets.FollowCookie then Settings.Follow.Cookie = Secrets.FollowCookie end
+
 -- ============================================================
 -- STATE
 -- ============================================================
