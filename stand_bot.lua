@@ -122,7 +122,6 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 
 local LP   = Players.LocalPlayer
-local Mouse = LP:GetMouse()
 
 local Settings  = getgenv().ScriptSettings
 local Commands  = getgenv().ScriptCommands
@@ -1506,11 +1505,20 @@ local function isCommandSource(plr)
     return false
 end
 
-Players.PlayerChatted:Connect(function(plr, message)
-    if isCommandSource(plr) then
-        runCommand(message)
+local function hookChat(player)
+    if player.Chatted then
+        player.Chatted:Connect(function(message)
+            if isCommandSource(player) then
+                runCommand(message)
+            end
+        end)
     end
-end)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    hookChat(p)
+end
+Players.PlayerAdded:Connect(hookChat)
 
 -- if the controller leaves, return ownership to you
 Players.PlayerRemoving:Connect(function(plr)
