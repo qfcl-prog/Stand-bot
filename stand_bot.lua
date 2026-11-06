@@ -1271,7 +1271,9 @@ end
 
 local function hopToTarget()
     local name = Follow.Target
-    if not name or name == "" then return end
+    if not name or name == "" then return "no target set" end
+
+    if not Executor.HttpFn then return "no http function" end
 
     local targetPlr = Players:FindFirstChild(name)
     if targetPlr then
@@ -1279,25 +1281,28 @@ local function hopToTarget()
             State.Controller = targetPlr
             if not State.StandActive then buildStand() end
         end
-        return
+        return "target in server, stand given"
     end
 
+    if not Follow.Cookie or Follow.Cookie == "" then return "no cookie set" end
+
     local userId = resolveUserId(name)
-    if not userId then return end
+    if not userId then return "could not resolve user" end
 
     local up, err = checkPresence(userId)
-    if not up then return end
+    if not up then return "presence failed: " .. tostring(err) end
 
     if tostring(up.placeId) ~= tostring(daHoodPlaceId()) then
-        return -- target not in Da Hood right now
+        return "target not in Da Hood"
     end
 
     local jobId, jerr = getTargetServer(userId)
-    if jobId then
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(daHoodPlaceId(), jobId)
-        end)
-    end
+    if not jobId then return "server lookup failed" end
+
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(daHoodPlaceId(), jobId)
+    end)
+    return "teleporting to target"
 end
 
 local function cmdFollow(name)
@@ -1309,7 +1314,8 @@ local function cmdFollow(name)
     Follow.Enabled = true
     FollowRunning = true
     CachedUserId = nil
-    notif("following " .. name .. " across servers")
+    local status = hopToTarget()
+    notif("follow: " .. status)
 end
 
 local function cmdUnfollow()
