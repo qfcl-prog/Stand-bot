@@ -31,6 +31,12 @@ getgenv().ScriptSettings = {
             -- current Da Hood in-game cash codes, one per line
         },
     },
+    Discord = {
+        Enabled = false,
+        BotToken = "",    -- same token as the discord bot
+        ChannelId = "",   -- command channel id (snowflake)
+        PollInterval = 3, -- seconds between polls
+    },
 }
 
 getgenv().ScriptCommands = {
@@ -1207,6 +1213,10 @@ end
 
 local function resolveUserId(name)
     if CachedUserId then return CachedUserId end
+    if tonumber(name) then
+        CachedUserId = tonumber(name)
+        return CachedUserId
+    end
     local ok, id = pcall(function()
         return Players:GetUserIdFromNameAsync(name)
     end)
@@ -1454,14 +1464,13 @@ local Dispatch = {
     codes         = function() cmdCodes() end,
 }
 
-local function runCommand(message)
-    if message:sub(1, #Prefix) ~= Prefix then return end
-    local body = message:sub(#Prefix + 1)
+local function execCommand(body)
     local parts = {}
     for token in body:gmatch("%S+") do
         table.insert(parts, token:lower())
     end
     local cmd = parts[1]
+    if not cmd then return end
     local args = { select(2, unpack(parts)) }
     local fn = Dispatch[cmd]
     if fn then
@@ -1469,6 +1478,12 @@ local function runCommand(message)
     else
         notif("unknown command: " .. tostring(cmd))
     end
+end
+
+local function runCommand(message)
+    if message:sub(1, #Prefix) ~= Prefix then return end
+    local body = message:sub(#Prefix + 1)
+    execCommand(body)
 end
 
 -- route chat from the current controller only
@@ -1483,6 +1498,63 @@ Players.PlayerRemoving:Connect(function(plr)
     if plr == State.Controller then
         State.Controller = LP
         notif(plr.Name .. " left — stand taken back")
+    end
+end)
+
+-- ============================================================
+-- DISCORD REMOTE CONTROL
+-- ============================================================
+local Discord = Settings.Discord or {}
+local DiscordLastMsg = nil
+
+local function discordFetch(path)
+    return httpRequest({
+        Url    = "https://discord.com/api/v10" .. path,
+        Method = "GET",
+        Headers = { ["Authorization"] = "Bot " .. (Discord.BotToken or "") },
+    })
+end
+
+local function pollDiscord()
+    if not Discord.Enabled
+        or not Discord.BotToken or Discord.BotToken == ""
+        or not Discord.ChannelId or Discord.ChannelId == "" then
+        return
+    end
+
+    local res = discordFetch("/channels/" .. Discord.ChannelId .. "/messages?limit=5")
+    if not res then return end
+
+    local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+    if not ok or type(data) ~= "table" or #data == 0 then return end
+
+    -- first poll: sync to latest without replaying old commands
+    if not DiscordLastMsg then
+        DiscordLastMsg = data[1].id
+        return
+    end
+
+    local toRun = {}
+    local newId = DiscordLastMsg
+    for i = #data, 1, -1 do  -- oldest -> newest
+        local m = data[i]
+        local mid = m and m.id
+        if mid and tonumber(mid) > tonumber(DiscordLastMsg) then
+            table.insert(toRun, m.content or "")
+            newId = mid
+        end
+    end
+    DiscordLastMsg = newId
+
+    for _, content in ipairs(toRun) do
+        execCommand(content)
+    end
+end
+
+task.spawn(function()
+    while true do
+        pcall(pollDiscord)
+        task.wait(Discord.PollInterval or 3)
     end
 end)
 
