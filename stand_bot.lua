@@ -21,7 +21,8 @@ local DEFAULT_SETTINGS = {
         Enabled = false,
         Target = "",          -- username to follow (set via .follow)
         PlaceId = 2788229376, -- Da Hood place ID (adjust if wrong)
-        Cookie = "",          -- bot's .ROBLOSECURITY cookie
+        Cookie = "",          -- single bot's .ROBLOSECURITY cookie (optional)
+        Cookies = {},         -- OR list: { {Name="bot1", Cookie="..."}, ... }
         CheckInterval = 10,   -- seconds between presence checks
         AutoGive = true,      -- hand the stand to target on arrival
     },
@@ -1248,6 +1249,40 @@ local function resolveUserId(name)
     return id
 end
 
+-- figure out this bot's own cookie: explicit single cookie, or match the list
+local OwnCookie = nil
+
+local function getOwnCookie()
+    if OwnCookie then return OwnCookie end
+
+    if Follow.Cookie and Follow.Cookie ~= "" then
+        OwnCookie = Follow.Cookie
+        return OwnCookie
+    end
+
+    for _, entry in ipairs(Follow.Cookies or {}) do
+        local c = entry and entry.Cookie
+        if c and c ~= "" then
+            local res = httpRequest({
+                Url    = "https://users.roblox.com/v1/users/authenticated",
+                Method = "GET",
+                Headers = { ["Cookie"] = ".ROBLOSECURITY=" .. c },
+            })
+            if res then
+                local ok, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+                if ok and data and data.name then
+                    if data.name:lower() == LP.Name:lower() then
+                        OwnCookie = c
+                        return OwnCookie
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
 local function checkPresence(userId)
     local body = HttpService:JSONEncode({ userIds = { userId } })
     local res, err = httpRequest({
@@ -1255,7 +1290,7 @@ local function checkPresence(userId)
         Method = "POST",
         Headers = {
             ["Content-Type"] = "application/json",
-            ["Cookie"] = ".ROBLOSECURITY=" .. (Follow.Cookie or ""),
+            ["Cookie"] = ".ROBLOSECURITY=" .. (getOwnCookie() or ""),
         },
         Body = body,
     })
@@ -1272,7 +1307,7 @@ local function getTargetServer(userId)
     local res, err = httpRequest({
         Url    = "https://www.roblox.com/game/join?placeId=" .. placeId .. "&userId=" .. userId,
         Method = "GET",
-        Headers = { ["Cookie"] = ".ROBLOSECURITY=" .. (Follow.Cookie or "") },
+        Headers = { ["Cookie"] = ".ROBLOSECURITY=" .. (getOwnCookie() or "") },
     })
     if not res then return nil, err end
     local jobId
@@ -1301,7 +1336,7 @@ local function hopToTarget()
         return "target in server, stand given"
     end
 
-    if not Follow.Cookie or Follow.Cookie == "" then return "no cookie set" end
+    if not getOwnCookie() then return "no cookie set" end
 
     local userId = resolveUserId(name)
     if not userId then return "could not resolve user" end
